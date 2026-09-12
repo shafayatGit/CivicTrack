@@ -7,6 +7,7 @@
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
     "db:migrate": "node src/db/migrate.js",
+    "db:seed:admin": "node src/utils/admin.seed.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -16,6 +17,7 @@
   "dependencies": {
     "bcrypt": "^6.0.0",
     "cloudinary": "^2.11.0",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",

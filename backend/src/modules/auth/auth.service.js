@@ -1,9 +1,17 @@
 import db from "../../config/db.js";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
+import { randomUUID } from "crypto";
 import ApiError from "../../utils/ApiError.js";
 
 const table = "users";
+
+const generateToken = (user) =>
+  jwt.sign(
+    { id: user.id, email: user.email, role: user.role },
+    process.env.JWT_SECRET,
+    { expiresIn: process.env.JWT_EXPIRES_IN || "7d" },
+  );
 
 export const createUser = async ({ name, email, password }) => {
   const [existing] = await db.query("SELECT id FROM users WHERE email = ?", [
@@ -14,12 +22,16 @@ export const createUser = async ({ name, email, password }) => {
   }
 
   const hashedPassword = await bcrypt.hash(password, 10);
-  const [result] = await db.query(
-    `INSERT INTO ${table} (name, email, password) VALUES (?, ?, ?)`,
-    [name, email, hashedPassword],
+  const id = randomUUID();
+  await db.query(
+    `INSERT INTO ${table} (id, name, email, password) VALUES (?, ?, ?, ?)`,
+    [id, name, email, hashedPassword],
   );
 
-  return { id: result.insertId, name, email };
+  const user = { id, name, email, role: "user" };
+  const token = generateToken(user);
+
+  return { token, user: { id: user.id, name: user.name, email: user.email, role: user.role } };
 };
 
 export const loginUser = async ({ email, password }) => {
@@ -35,11 +47,7 @@ export const loginUser = async ({ email, password }) => {
     throw new ApiError(401, "Invalid credentials");
   }
 
-  const token = jwt.sign(
-    { id: user.id, email: user.email, role: user.role },
-    process.env.JWT_SECRET,
-    { expiresIn: process.env.JWT_EXPIRES_IN || "7d" },
-  );
+  const token = generateToken(user);
 
   return {
     token,
