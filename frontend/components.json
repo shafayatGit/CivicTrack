@@ -2,11 +2,11 @@
   "$schema": "https://ui.shadcn.com/schema.json",
   "style": "base-rhea",
   "rsc": true,
-  "tsx": true,
+  "tsx": false,
   "tailwind": {
     "config": "",
     "css": "app/globals.css",
-    "baseColor": "olive",
+    "baseColor": "mist",
     "cssVariables": true,
     "prefix": ""
   },
