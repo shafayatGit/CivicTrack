@@ -128,3 +128,38 @@
     @apply font-sans;
   }
 }
+
+/*
+ * The map pin is a divIcon (see components/Modules/Issues/LocationPicker.jsx), which
+ * means its appearance is plain CSS rather than a Leaflet image asset. Leaflet
+ * positions the wrapper itself; this only draws the visible head.
+ */
+.civictrack-pin {
+  background: none;
+  border: none;
+}
+
+.civictrack-pin__dot {
+  display: block;
+  width: 26px;
+  height: 26px;
+  border-radius: 50% 50% 50% 0;
+  background: var(--destructive);
+  border: 2px solid var(--background);
+  box-shadow:
+    0 1px 4px rgb(0 0 0 / 35%),
+    0 0 0 1px rgb(0 0 0 / 10%);
+  transform: rotate(-45deg);
+  transform-origin: 50% 100%;
+}
+
+/* Keep the default zoom control legible against the tiles without restyling the
+   whole Leaflet control set. */
+.leaflet-container {
+  font: inherit;
+  background: var(--muted);
+}
+
+.leaflet-control-attribution {
+  font-size: 10px;
+}

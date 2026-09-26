@@ -1,10 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -14,6 +12,7 @@ import {
 } from "@/components/ui/card";
 
 import { createCategory } from "@/lib/api";
+import LinkButton from "@/components/Modules/Common/LinkButton";
 import CategoryForm from "@/components/Modules/Admin/CategoryForm";
 
 const CreateCategoryPage = () => {
@@ -27,14 +26,14 @@ const CreateCategoryPage = () => {
 
   return (
     <div className="mx-auto w-full max-w-lg space-y-4">
-      <Button
+      <LinkButton
+        href="/admin/categories"
         variant="ghost"
-        render={<Link href="/admin/categories" />}
         className="gap-1.5 text-muted-foreground"
       >
         <ArrowLeft />
         Back to categories
-      </Button>
+      </LinkButton>
 
       <Card>
         <CardHeader>

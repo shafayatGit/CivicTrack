@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useSyncExternalStore } from "react";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, LogOut, Menu } from "lucide-react";
 
@@ -13,48 +13,32 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 
-import {
-  clearToken,
-  decodeToken,
-  getToken,
-} from "@/lib/api";
-
+import { useAuth } from "@/components/Modules/Auth/AuthProvider";
 import AdminSidebar from "@/components/Modules/Admin/AdminSidebar";
 
-const subscribe = (onStoreChange) => {
-  window.addEventListener("storage", onStoreChange);
-  return () => window.removeEventListener("storage", onStoreChange);
-};
-
-const getTokenSnapshot = () => getToken();
+const AdminFallback = () => (
+  <main className="flex min-h-svh items-center justify-center p-4">
+    <Loader2 className="size-6 animate-spin text-muted-foreground" />
+  </main>
+);
 
 const AdminLayout = ({ children }) => {
   const router = useRouter();
-  const token = useSyncExternalStore(subscribe, getTokenSnapshot, () => null);
-
-  const isAdmin = useMemo(() => {
-    if (!token) {
-      return false;
-    }
-    return decodeToken(token)?.role === "admin";
-  }, [token]);
+  const { isAdmin, hydrated, signOut } = useAuth();
+  const needsAuth = hydrated && !isAdmin;
 
   useEffect(() => {
-    if (!isAdmin) {
-      router.replace(token ? "/" : "/login");
+    if (needsAuth) {
+      router.replace(hydrated ? "/login" : "/");
     }
-  }, [isAdmin, token, router]);
+  }, [needsAuth, hydrated, router]);
 
-  if (!isAdmin) {
-    return (
-      <main className="flex min-h-svh items-center justify-center p-4">
-        <Loader2 className="size-6 animate-spin text-muted-foreground" />
-      </main>
-    );
+  if (!hydrated || needsAuth) {
+    return <AdminFallback />;
   }
 
   const handleLogout = () => {
-    clearToken();
+    signOut();
     router.push("/login");
   };
 

@@ -34,14 +34,40 @@ function Carousel({
     },
     plugins
   )
-  const [canScrollPrev, setCanScrollPrev] = React.useState(false)
-  const [canScrollNext, setCanScrollNext] = React.useState(false)
+  // Whether the arrows should be enabled is derived state, not stored state: embla
+  // already holds the truth in canScrollPrev()/canScrollNext(). Reading it through
+  // useSyncExternalStore keeps the buttons correct on the first render after the
+  // plugin mounts, without seeding them from a setState in an effect body.
+  const subscribe = React.useCallback(
+    (onStoreChange) => {
+      if (!api) return () => {}
 
-  const onSelect = React.useCallback((api) => {
-    if (!api) return
-    setCanScrollPrev(api.canScrollPrev())
-    setCanScrollNext(api.canScrollNext())
-  }, [])
+      api.on("select", onStoreChange)
+      api.on("reInit", onStoreChange)
+
+      return () => {
+        api.off("select", onStoreChange)
+        api.off("reInit", onStoreChange)
+      }
+    },
+    [api]
+  )
+
+  const getSnapshot = React.useCallback(() => {
+    if (!api) return 0
+
+    // Packed into a number so the snapshot is a primitive: returning a fresh object
+    // each call would make React re-render forever.
+    return (api.canScrollPrev() ? 1 : 0) | (api.canScrollNext() ? 2 : 0)
+  }, [api])
+
+  const scrollEdges = React.useSyncExternalStore(
+    subscribe,
+    getSnapshot,
+    () => 0
+  )
+  const canScrollPrev = (scrollEdges & 1) !== 0
+  const canScrollNext = (scrollEdges & 2) !== 0
 
   const scrollPrev = React.useCallback(() => {
     api?.scrollPrev()
@@ -68,17 +94,6 @@ function Carousel({
     if (!api || !setApi) return
     setApi(api)
   }, [api, setApi])
-
-  React.useEffect(() => {
-    if (!api) return
-    onSelect(api)
-    api.on("reInit", onSelect)
-    api.on("select", onSelect)
-
-    return () => {
-      api?.off("select", onSelect)
-    }
-  }, [api, onSelect])
 
   return (
     <CarouselContext.Provider

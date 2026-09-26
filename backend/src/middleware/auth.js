@@ -23,3 +23,16 @@ export const adminOnly = (req, res, next) => {
   }
   next();
 };
+
+// The role half of requireRole, kept separate so the two middlewares can never be
+// applied out of order.
+const allowRoles = (...roles) => (req, res, next) => {
+  if (!req.user || !roles.includes(req.user.role)) {
+    throw new ApiError(403, `Requires one of: ${roles.join(', ')}`);
+  }
+  next();
+};
+
+// `protect` then one of the role guards, collapsed into a single middleware so a
+// route cannot accidentally ship the guard in the wrong order.
+export const requireRole = (...roles) => [protect, allowRoles(...roles)];

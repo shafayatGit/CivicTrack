@@ -16,6 +16,7 @@ import {
 import {
   Field,
   FieldContent,
+  FieldDescription,
   FieldError,
   FieldLabel,
 } from "@/components/ui/field";
@@ -27,8 +28,15 @@ import {
 } from "@/components/ui/alert";
 
 import { ApiRequestError, registerUser, setToken } from "@/lib/api";
+import { landingPathFor } from "@/lib/navigation";
 
-const initialFieldErrors = { name: "", email: "", password: "" };
+const initialFieldErrors = { name: "", email: "", nid: "", password: "" };
+
+// Mirrors NID_PATTERN in backend/src/utils/nid.js — the single backend definition
+// shared by registration and staff onboarding. Lengths are 10, 13, or 17 digits;
+// keeping the two in step means the form never sends a value the API is going to
+// reject.
+const NID_PATTERN = /^(?:\d{10}|\d{13}|\d{17})$/;
 
 const getFieldErrors = (form) => {
   const errors = { ...initialFieldErrors };
@@ -39,6 +47,9 @@ const getFieldErrors = (form) => {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
     errors.email = "Enter a valid email address.";
   }
+  if (!NID_PATTERN.test(form.nid.trim())) {
+    errors.nid = "Enter a valid National ID (10, 13, or 17 digits).";
+  }
   if (form.password.length < 6) {
     errors.password = "Password must be at least 6 characters.";
   }
@@ -48,7 +59,12 @@ const getFieldErrors = (form) => {
 
 const RegisterForm = () => {
   const router = useRouter();
-  const [form, setForm] = useState({ name: "", email: "", password: "" });
+  const [form, setForm] = useState({
+    name: "",
+    email: "",
+    nid: "",
+    password: "",
+  });
   const [fieldErrors, setFieldErrors] = useState(initialFieldErrors);
   const [serverError, setServerError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -73,10 +89,13 @@ const RegisterForm = () => {
       const data = await registerUser({
         name: form.name.trim(),
         email: form.email.trim(),
+        nid: form.nid.trim(),
         password: form.password,
       });
       setToken(data.data.token);
-      router.push("/");
+      // A new account is always a citizen, so this lands on their dashboard. It still
+      // goes through the shared helper rather than hardcoding "/dashboard".
+      router.push(landingPathFor("citizen"));
     } catch (error) {
       if (error instanceof ApiRequestError && error.response) {
         const fieldErrorsFromServer = {};
@@ -155,6 +174,28 @@ const RegisterForm = () => {
                 aria-invalid={Boolean(fieldErrors.email)}
               />
               {fieldErrors.email && <FieldError>{fieldErrors.email}</FieldError>}
+            </FieldContent>
+          </Field>
+
+          <Field>
+            <FieldLabel htmlFor="nid">National ID</FieldLabel>
+            <FieldContent>
+              <Input
+                id="nid"
+                name="nid"
+                type="text"
+                inputMode="numeric"
+                placeholder="10, 13, or 17 digits"
+                value={form.nid}
+                onChange={handleChange}
+                disabled={submitting}
+                aria-invalid={Boolean(fieldErrors.nid)}
+              />
+              {fieldErrors.nid && <FieldError>{fieldErrors.nid}</FieldError>}
+              <FieldDescription>
+                Used to verify citizen accounts and reduce fake reports. It is
+                never shown publicly.
+              </FieldDescription>
             </FieldContent>
           </Field>
 

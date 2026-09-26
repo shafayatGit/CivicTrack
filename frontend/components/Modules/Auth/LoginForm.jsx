@@ -26,7 +26,13 @@ import {
   AlertTitle,
 } from "@/components/ui/alert";
 
-import { ApiRequestError, decodeToken, loginUser, setToken } from "@/lib/api";
+import {
+  ApiRequestError,
+  loginUser,
+  sessionFromToken,
+  setToken,
+} from "@/lib/api";
+import { landingPathFor } from "@/lib/navigation";
 
 const initialFieldErrors = { email: "", password: "" };
 
@@ -72,8 +78,11 @@ const LoginForm = () => {
         password: form.password,
       });
       setToken(data.data.token);
-      const payload = decodeToken(data.data.token);
-      router.push(payload?.role === "admin" ? "/admin" : "/");
+      // Read the role through the shared helper, then ask navigation.js where that
+      // role belongs. Both steps are shared so a third role cannot end up in a branch
+      // that nobody thought about.
+      const session = sessionFromToken(data.data.token);
+      router.push(landingPathFor(session?.role));
     } catch (error) {
       if (error instanceof ApiRequestError && error.response) {
         const fieldErrorsFromServer = {};
