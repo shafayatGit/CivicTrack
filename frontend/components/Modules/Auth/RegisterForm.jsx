@@ -21,11 +21,7 @@ import {
   FieldLabel,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
-} from "@/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 import { ApiRequestError, registerUser, setToken } from "@/lib/api";
 import { landingPathFor } from "@/lib/navigation";
@@ -140,7 +136,11 @@ const RegisterForm = () => {
           </Alert>
         )}
 
-        <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-5">
+        <form
+          onSubmit={handleSubmit}
+          noValidate
+          className="flex flex-col gap-5"
+        >
           <Field>
             <FieldLabel htmlFor="name">Full name</FieldLabel>
             <FieldContent>
@@ -149,7 +149,7 @@ const RegisterForm = () => {
                 name="name"
                 type="text"
                 autoComplete="name"
-                placeholder="Jane Doe"
+                placeholder="eg. Md Shafayat Hossain"
                 value={form.name}
                 onChange={handleChange}
                 disabled={submitting}
@@ -167,13 +167,15 @@ const RegisterForm = () => {
                 name="email"
                 type="email"
                 autoComplete="email"
-                placeholder="jane@example.com"
+                placeholder="eg .shafayathossain.drmc@gmail.com"
                 value={form.email}
                 onChange={handleChange}
                 disabled={submitting}
                 aria-invalid={Boolean(fieldErrors.email)}
               />
-              {fieldErrors.email && <FieldError>{fieldErrors.email}</FieldError>}
+              {fieldErrors.email && (
+                <FieldError>{fieldErrors.email}</FieldError>
+              )}
             </FieldContent>
           </Field>
 

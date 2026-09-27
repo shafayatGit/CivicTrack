@@ -20,11 +20,7 @@ import {
   FieldLabel,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
-} from "@/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 import {
   ApiRequestError,
@@ -116,8 +112,7 @@ const LoginForm = () => {
       <CardHeader className="text-center">
         <CardTitle className="text-2xl">Welcome back</CardTitle>
         <CardDescription>
-          Sign in to your CivicTrack account to report issues in your
-          community.
+          Sign in to your CivicTrack account to report issues in your community.
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-6">
@@ -128,7 +123,11 @@ const LoginForm = () => {
           </Alert>
         )}
 
-        <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-5">
+        <form
+          onSubmit={handleSubmit}
+          noValidate
+          className="flex flex-col gap-5"
+        >
           <Field>
             <FieldLabel htmlFor="email">Email</FieldLabel>
             <FieldContent>
@@ -137,13 +136,15 @@ const LoginForm = () => {
                 name="email"
                 type="email"
                 autoComplete="email"
-                placeholder="jane@example.com"
+                placeholder="eg. shafayathossain.drmc@gmail.com"
                 value={form.email}
                 onChange={handleChange}
                 disabled={submitting}
                 aria-invalid={Boolean(fieldErrors.email)}
               />
-              {fieldErrors.email && <FieldError>{fieldErrors.email}</FieldError>}
+              {fieldErrors.email && (
+                <FieldError>{fieldErrors.email}</FieldError>
+              )}
             </FieldContent>
           </Field>
 
