@@ -31,7 +31,7 @@ const initialFieldErrors = { name: "", email: "", nid: "", password: "" };
 // Mirrors NID_PATTERN in backend/src/utils/nid.js — the single backend definition
 // shared by registration and staff onboarding. Lengths are 10, 13, or 17 digits;
 // keeping the two in step means the form never sends a value the API is going to
-// reject.
+// reject..
 const NID_PATTERN = /^(?:\d{10}|\d{13}|\d{17})$/;
 
 const getFieldErrors = (form) => {
