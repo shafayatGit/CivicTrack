@@ -68,15 +68,17 @@ export const formatRelative = (value) => {
 
 // MySQL hands back computed aggregates (COUNT, SUM, and anything COALESCE-wrapped)
 // as strings, so a count arriving as "12" is normal rather than a type error.
-// Coerce before formatting, and treat a missing value as zero so a column that
-// legitimately has no value still renders instead of blanking the table cell.
-export const formatNumber = (value) => {
+// Anything that has to do arithmetic on those values needs the number, not the
+// formatted string, so the coercion is exported on its own.
+export const toNumber = (value) => {
   const parsed = typeof value === "number" ? value : Number.parseFloat(value);
 
-  return Number.isFinite(parsed)
-    ? new Intl.NumberFormat("en-US").format(parsed)
-    : "0";
+  return Number.isFinite(parsed) ? parsed : 0;
 };
+
+// Coerce before formatting, and treat a missing value as zero so a column that
+// legitimately has no value still renders instead of blanking the table cell.
+export const formatNumber = (value) => new Intl.NumberFormat("en-US").format(toNumber(value));
 
 export const initials = (name) =>
   (name ?? "?")

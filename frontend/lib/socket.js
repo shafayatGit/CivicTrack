@@ -2,7 +2,7 @@
 
 import { io } from "socket.io-client";
 
-import { getToken } from "./api";
+import { AUTH_CHANGE_EVENT, getToken } from "./api";
 
 const SOCKET_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
@@ -12,20 +12,36 @@ const SOCKET_URL =
 // open a second WebSocket and duplicate every broadcast the user receives.
 let socket = null;
 
+// The token the live socket handshook with. A socket authenticates once, at
+// connect: every event it carries is attributed to the user in that JWT, so it
+// has to be dropped whenever the stored token stops matching. Without this, a tab
+// that signs out and back in as somebody else keeps sending as its first user —
+// the REST calls follow localStorage while the socket does not, and messages land
+// attributed to the previous account.
+let socketToken = null;
+
 export const getSocket = () => {
   if (typeof window === "undefined") {
     return null;
+  }
+
+  if (socket && socketToken !== getToken()) {
+    disconnectSocket();
   }
 
   if (socket) {
     return socket;
   }
 
+  socketToken = getToken();
+
   socket = io(SOCKET_URL, {
     path: "/socket.io",
     // realtime/index.js reads the JWT from the handshake because the browser
-    // WebSocket API cannot set an Authorization header.
-    auth: { token: getToken() },
+    // WebSocket API cannot set an Authorization header. A function, not a value:
+    // socket.io reuses `auth` for every reconnect, so a token read once here
+    // would be replayed for the life of the tab.
+    auth: (callback) => callback({ token: getToken() }),
     transports: ["websocket", "polling"],
     autoConnect: false,
   });
@@ -36,7 +52,24 @@ export const getSocket = () => {
 export const disconnectSocket = () => {
   socket?.disconnect();
   socket = null;
+  socketToken = null;
 };
+
+// Eagerly drop the connection on a token change instead of waiting for the next
+// getSocket() call, so a signed-out tab is not left holding a live authenticated
+// socket and still receiving broadcasts.
+const dropSocketOnTokenChange = () => {
+  if (socket && socketToken !== getToken()) {
+    disconnectSocket();
+  }
+};
+
+if (typeof window !== "undefined") {
+  // Same-tab sign-in and sign-out, plus the `storage` event for either one
+  // happening in another tab of the same browser.
+  window.addEventListener(AUTH_CHANGE_EVENT, dropSocketOnTokenChange);
+  window.addEventListener("storage", dropSocketOnTokenChange);
+}
 
 // The backend answers every command with an ack rather than an event, so a
 // rejected send is a resolved promise carrying the error instead of a throw that

@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -24,19 +25,11 @@ import {
 } from "@/components/ui/sheet";
 
 import LinkButton from "@/components/Modules/Common/LinkButton";
+import Brand from "@/components/Modules/Layout/Brand";
 import { useAuth } from "@/components/Modules/Auth/AuthProvider";
 import { isNavItemActive, portalNavFor } from "@/lib/navigation";
 import { initials } from "@/lib/format";
 import { cn } from "@/lib/utils";
-
-const Brand = () => (
-  <Link href="/" className="flex items-center gap-2 font-heading text-base font-semibold">
-    <span className="flex size-8 items-center justify-center rounded-xl bg-primary text-sm text-primary-foreground">
-      CT
-    </span>
-    CivicTrack
-  </Link>
-);
 
 const NavLinks = ({ items, pathname, onNavigate, className }) => (
   <nav className={cn("flex items-center gap-1", className)}>
@@ -88,28 +81,30 @@ const UserMenu = () => {
         </span>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuLabel className="flex flex-col gap-0.5">
-          <span className="truncate text-sm font-medium text-foreground">
-            {session.name}
-          </span>
-          <span className="truncate text-xs font-normal text-muted-foreground">
-            {session.email}
-          </span>
-        </DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem className="gap-2">
-          <User />
-          <Badge variant="secondary">{session.role}</Badge>
-        </DropdownMenuItem>
-        {session.role === "admin" && (
-          <DropdownMenuItem
-            className="gap-2"
-            onClick={() => router.push("/admin")}
-          >
-            <ShieldCheck />
-            Admin console
+        <DropdownMenuGroup>
+          <DropdownMenuLabel className="flex flex-col gap-0.5">
+            <span className="truncate text-sm font-medium text-foreground">
+              {session.name}
+            </span>
+            <span className="truncate text-xs font-normal text-muted-foreground">
+              {session.email}
+            </span>
+          </DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem className="gap-2">
+            <User />
+            <Badge variant="secondary">{session.role}</Badge>
           </DropdownMenuItem>
-        )}
+          {session.role === "admin" && (
+            <DropdownMenuItem
+              className="gap-2"
+              onClick={() => router.push("/admin")}
+            >
+              <ShieldCheck />
+              Admin console
+            </DropdownMenuItem>
+          )}
+        </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuItem
           variant="destructive"
@@ -178,7 +173,9 @@ const SiteHeader = () => {
                 <Menu />
               </SheetTrigger>
               <SheetContent side="right" className="w-72">
-                <SheetTitle className="font-heading">CivicTrack</SheetTitle>
+                <SheetTitle className="font-heading">
+                  <Brand />
+                </SheetTitle>
                 <SheetDescription className="sr-only">
                   Site navigation
                 </SheetDescription>
