@@ -1,6 +1,7 @@
 import {
   Building2,
   ChartNoAxesColumn,
+  Flag,
   FolderTree,
   LayoutDashboard,
   LifeBuoy,
@@ -44,6 +45,10 @@ export const ADMIN_NAV = [
     ],
   },
   {
+    label: "Moderation",
+    items: [{ href: "/admin/false-reports", label: "False reports", icon: Flag }],
+  },
+  {
     label: "Communication",
     items: [{ href: "/messages", label: "Messages", icon: MessagesSquare }],
   },
@@ -57,6 +62,7 @@ const ACTIVE_PREFIXES = {
   "/admin/staff": ["/admin/staff"],
   "/admin/issues": ["/admin/issues"],
   "/admin/reports": ["/admin/reports"],
+  "/admin/false-reports": ["/admin/false-reports"],
 };
 
 export const isNavItemActive = (href, pathname) => {

@@ -6,24 +6,27 @@ import {
 } from './issuePhoto.validation.js';
 import validate from '../../middleware/validate.js';
 import { issuePhotoUpload } from '../../middleware/upload.js';
-import { protect, adminOnly } from '../../middleware/auth.js';
+import { protect, adminOnly, optionalAuth } from '../../middleware/auth.js';
 import { canManageIssuePhotos } from '../../middleware/issuePhotoAccess.js';
 
 const router = Router();
 
-// Reads are open to any signed-in user: a report and its evidence are public.
+// Reads are open to anyone, including a visitor with no account: the report itself is
+// public at /issues/:id, and a photo is usually the whole point of the report. The
+// image is served from the issue row the reader could already fetch, so nothing is
+// exposed here that the detail page does not link to anyway.
 // Writes go through canManageIssuePhotos rather than a role check — admins always,
 // the reporting citizen only while the issue is still 'Reported'. See
 // middleware/issuePhotoAccess.js for why that middle is closed.
 //
 // That middleware reads req.body.issueId, which for the multipart route only exists
 // after multer has parsed the body — so the file is buffered before it is
-// authorized. The cost is bounded: `protect` has already run, so only a signed-in
-// user reaches multer, and its 5MB/one-file limits cap what an unauthorized caller
-// can make the server hold. Moving the check earlier would mean trusting an id from
-// the query string instead of the body, which is worse.
-router.get('/issue/:issueId', protect, issuePhotoController.listPhotosByIssue);
-router.get('/:id', protect, issuePhotoController.getPhoto);
+// authorized. The cost is bounded: `protect` has already run on the write routes, so
+// only a signed-in user reaches multer, and its 5MB/one-file limits cap what an
+// unauthorized caller can make the server hold. Moving the check earlier would mean
+// trusting an id from the query string instead of the body, which is worse.
+router.get('/issue/:issueId', optionalAuth, issuePhotoController.listPhotosByIssue);
+router.get('/:id', optionalAuth, issuePhotoController.getPhoto);
 
 router.post(
   '/',

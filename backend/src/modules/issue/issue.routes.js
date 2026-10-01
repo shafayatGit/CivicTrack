@@ -6,9 +6,10 @@ import {
   listIssuesQuerySchema,
   myIssuesQuerySchema,
   duplicateQuerySchema,
+  flagIssueSchema,
 } from './issue.validation.js';
 import validate, { validateQuery } from '../../middleware/validate.js';
-import { protect } from '../../middleware/auth.js';
+import { protect, optionalAuth, requireRole } from '../../middleware/auth.js';
 
 const router = Router();
 
@@ -35,9 +36,20 @@ router.get('/mine', protect, validateQuery(myIssuesQuerySchema), issueController
 router.get('/my-stats', protect, issueController.getMyStats);
 
 router.get('/', protect, validateQuery(listIssuesQuerySchema), issueController.listIssues);
-router.get('/:id', protect, issueController.getIssue);
+// Public. An issue page is the whole point of a public reporting app, and it has to be
+// readable by someone with no account or there is nothing for them to vote on or
+// comment on. optionalAuth attaches req.user when a token is present — which is what
+// keeps the reporter's own "is this mine" checks and the staff management panels
+// working — and never refuses the request.
+//
+// The other GETs stay behind `protect`: the aggregate stats and the resolved summary
+// are dashboard data, not something a public page needs.
+router.get('/:id', optionalAuth, issueController.getIssue);
 
-router.get('/:id/status-history', protect, issueController.getStatusHistory);
+// Public for the same reason as '/:id': a status timeline is the substance of a public
+// report, and it discloses nothing the issue row does not already — the acting officer
+// is identified by name, exactly like `assignee_name` on the detail payload.
+router.get('/:id/status-history', optionalAuth, issueController.getStatusHistory);
 
 // Any signed-in user can report an issue; the reporter is taken from the token, not
 // the body, so a citizen cannot file in someone else's name. No role guard here on
@@ -54,6 +66,17 @@ router.put(
   protect,
   validate(updateIssueSchema),
   issueController.updateIssue,
+);
+
+// Flagging a report false is a judgement made on the ground by the officer it is
+// assigned to, so it is staff-only — an admin's role is to review the queue this
+// feeds, not to add to it. requireRole already supplies `protect`, so this does not
+// repeat it.
+router.post(
+  '/:id/invalid',
+  ...requireRole('staff'),
+  validate(flagIssueSchema),
+  issueController.flagIssueAsInvalid,
 );
 
 export default router;

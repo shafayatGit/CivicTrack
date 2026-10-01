@@ -29,6 +29,14 @@ const errorHandler = (err, req, res, next) => {
   } else if (err.code === 'ER_DUP_ENTRY') {
     statusCode = 409;
     message = 'Record already exists';
+  } else if (err.code === 'ER_INNODB_AUTOEXTEND_SIZE_OUT_OF_RANGE' && /CONSTRAINT .* failed/.test(err.sqlMessage ?? '')) {
+    // MariaDB 10.4 reports a failed CHECK constraint with this unrelated code (a
+    // long-standing server bug — the message is the only reliable signal). Without
+    // this branch a violated CHECK surfaces as an opaque 500, which reads as a server
+    // fault when it is really a bad write. Keyed on the message as well as the code so
+    // a genuine autoextend failure, which never mentions a constraint, still 500s.
+    statusCode = 400;
+    message = 'Value rejected by a database constraint';
   } else if (err.code === 'ER_DATA_TOO_LONG' || err.code === 'WARN_DATA_TRUNCATED') {
     statusCode = 400;
     message = 'A submitted value is longer than the column allows';

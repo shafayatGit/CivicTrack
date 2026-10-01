@@ -120,6 +120,12 @@ export const apiFetch = async (path, { body, headers, ...options } = {}) => {
 
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
+    // Required, not optional: the API is on a different origin (localhost:3000 vs
+    // :8000), and the anonymous voter token arrives and leaves as an httpOnly cookie
+    // the server sets. Without this the browser neither stores nor returns it, and
+    // every vote would look like a brand new voter on each click. The server reflects
+    // the origin and sets Access-Control-Allow-Credentials, so this is permitted.
+    credentials: "include",
     headers: requestHeaders,
     body: body === undefined ? undefined : isFormData ? body : JSON.stringify(body),
   });
@@ -261,6 +267,65 @@ export const createIssue = (payload) =>
 
 export const updateIssue = (id, payload) =>
   apiFetch(`/api/issues/${id}`, { method: "PUT", body: payload });
+
+// The officer's verdict that a report is not real. Separate from updateIssue because
+// it is a moderation judgement with its own rules (staff only, and only on an issue
+// assigned to them), not a workflow transition.
+export const flagIssueAsInvalid = (id, payload) =>
+  apiFetch(`/api/issues/${id}/invalid`, { method: "POST", body: payload });
+
+// --- false reports ---------------------------------------------------------
+
+// The admin moderation queue. The backend defaults status to 'pending', so omitting
+// it asks for "what still needs a decision", which is the question this screen exists
+// to answer.
+export const listFalseReports = (query) =>
+  apiFetch(withQuery("/api/false-reports", query));
+
+// Upholding the flag: deactivates the citizen who filed the report.
+export const deactivateCitizen = (flagId, payload) =>
+  apiFetch(`/api/false-reports/${flagId}/deactivate`, { method: "POST", body: payload });
+
+// Dismissing it: the officer was wrong, the report returns to the workflow.
+export const dismissFalseReport = (flagId) =>
+  apiFetch(`/api/false-reports/${flagId}/dismiss`, { method: "POST" });
+
+// --- users -----------------------------------------------------------------
+
+export const getUser = (id) => apiFetch(`/api/users/${id}`);
+
+export const reactivateUser = (id) =>
+  apiFetch(`/api/users/${id}/reactivate`, { method: "POST" });
+
+// --- public participation: votes and comments ------------------------------
+// None of these require a session. The vote identity rides on the httpOnly
+// `ct_voter` cookie the server sets, which is why apiFetch sends credentials.
+
+export const getVoteSummary = (id) => apiFetch(`/api/issues/${id}/vote`);
+
+// Toggles: one call both casts and withdraws a vote, and answers with the new state
+// AND the new count, so the button and the badge can never disagree.
+export const toggleVote = (id) => apiFetch(`/api/issues/${id}/vote`, { method: "POST" });
+
+export const listComments = (id, query) =>
+  apiFetch(withQuery(`/api/issues/${id}/comments`, query));
+
+// `authorName` is ignored by the server for a signed-in user — it always uses the
+// account name — and only applies to an anonymous comment.
+export const createComment = (id, payload) =>
+  apiFetch(`/api/issues/${id}/comments`, { method: "POST", body: payload });
+
+// Admin moderation, on a different URL from the public thread so the two cannot be
+// confused for one another.
+export const hideComment = (id, payload) =>
+  apiFetch(`/api/moderation/comments/${id}/hide`, { method: "POST", body: payload });
+
+export const restoreComment = (id) =>
+  apiFetch(`/api/moderation/comments/${id}/restore`, { method: "POST" });
+
+export const deleteComment = (id) =>
+  apiFetch(`/api/moderation/comments/${id}`, { method: "DELETE" });
+
 
 // --- issue photos -----------------------------------------------------------
 

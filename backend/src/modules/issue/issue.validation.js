@@ -72,3 +72,14 @@ export const duplicateQuerySchema = z.object({
   ...coordinates,
   radiusKm: z.coerce.number().min(0.1).max(50).default(1),
 });
+
+// The officer's own explanation for calling a report false. It is the only thing an
+// admin has to go on besides the issue itself, and it is what a wrongly-deactivated
+// citizen would be shown, so it is required and bounded rather than optional free text.
+export const flagIssueSchema = z.object({
+  reason: z
+    .string()
+    .trim()
+    .min(10, 'Explain in at least 10 characters why this is not a real report')
+    .max(255),
+});

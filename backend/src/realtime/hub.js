@@ -45,3 +45,17 @@ export const emitToParticipants = ({ staffId, adminId, issueId }, event, payload
   emitToUser(adminId, event, payload);
   emitToThread(staffId, adminId, issueId, event, payload);
 };
+
+// Hard eviction, used when an account is deactivated. A socket is authenticated once
+// at connect, so refusing the handshake is not enough: the connection opened before
+// the deactivation would stay open and keep delivering, and keep sending, as a
+// banned account. Disconnecting is what makes "deactivated" mean it for a live
+// session rather than only for the next login.
+//
+// This is the one thing in this module that is not an emit, and it is here rather
+// than in the deactivation service so that service never has to reach for the
+// socket.io instance itself — which would mean importing it and reintroducing the
+// emit/handle cycle this module exists to break.
+export const disconnectUser = (userId) => {
+  io?.in(userRoom(userId)).disconnectSockets(true);
+};

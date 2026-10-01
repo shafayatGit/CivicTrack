@@ -2,6 +2,9 @@ import { randomUUID } from 'crypto';
 import db from '../../config/db.js';
 import ApiError from '../../utils/ApiError.js';
 import { buildMeta, limitClause, paginationSchema } from '../../utils/pagination.js';
+// Shared so the per-department "open" figure cannot drift from staff.issue_count or
+// from the dashboard counters, which all narrow on the same two conditions.
+import { openIssuePredicate } from '../issue/issue.service.js';
 
 const COLUMNS = 'id, name, contact_email, created_at, updated_at';
 
@@ -46,9 +49,10 @@ export const listDepartments = async (query) => {
 
   const [rows] = await db.query(
     `SELECT d.id, d.name, d.contact_email, d.created_at, d.updated_at,
-            COALESCE(SUM(i.status <> 'Resolved'), 0) AS open_issues,
-            COALESCE(SUM(i.status =  'Resolved'), 0) AS resolved_issues,
-            COUNT(i.id)                            AS total_issues
+     COALESCE(SUM(${openIssuePredicate('i')}), 0) AS open_issues,
+     COALESCE(SUM(i.status =  'Resolved'), 0)  AS resolved_issues,
+     COALESCE(SUM(i.is_invalid = TRUE), 0)     AS invalid_issues,
+     COUNT(i.id)                               AS total_issues
      FROM departments d
      LEFT JOIN issues i ON i.department_id = d.id
      GROUP BY d.id, d.name, d.contact_email, d.created_at, d.updated_at

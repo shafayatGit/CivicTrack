@@ -21,6 +21,11 @@ export const updateIssue = asyncHandler(async (req, res) => {
   res.json({ success: true, data: issue });
 });
 
+export const flagIssueAsInvalid = asyncHandler(async (req, res) => {
+  const issue = await issueService.flagIssueAsInvalid(req.params.id, req.user, req.body);
+  res.status(201).json({ success: true, data: issue });
+});
+
 export const getStatusHistory = asyncHandler(async (req, res) => {
   const history = await issueService.getStatusHistory(req.params.id);
   res.json({ success: true, data: history });

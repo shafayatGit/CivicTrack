@@ -19,10 +19,21 @@ const generateToken = (user) =>
   );
 
 export const createUser = async ({ name, email, nid, password }) => {
-  const [existing] = await db.query("SELECT id FROM users WHERE email = ?", [
-    email,
-  ]);
+  const [existing] = await db.query(
+    "SELECT id, is_active FROM users WHERE email = ?",
+    [email],
+  );
   if (existing.length > 0) {
+    // A deactivated account cannot be walked around by registering again with the
+    // same mailbox. The 409 the active case gets is the honest one — the address is
+    // taken — but the reason matters to the person typing it, so it is spelled out.
+    if (!existing[0].is_active) {
+      throw new ApiError(
+        403,
+        "This email belongs to a deactivated account and cannot be registered again",
+      );
+    }
+
     throw new ApiError(409, "Email already registered");
   }
 
@@ -48,11 +59,27 @@ export const createUser = async ({ name, email, nid, password }) => {
 };
 
 export const loginUser = async ({ email, password }) => {
-  const [rows] = await db.query("SELECT * FROM users WHERE email = ?", [email]);
+  const [rows] = await db.query(
+    "SELECT * FROM users WHERE email = ?",
+    [email],
+  );
   const user = rows[0];
 
   if (!user) {
     throw new ApiError(401, "Invalid credentials");
+  }
+
+  // Checked before the password so a deactivated account cannot be probed for
+  // credentials, and so the reason it is closed is what the person is told. The
+  // admin's note is included because "why was I banned" is the only question this
+  // response can usefully answer.
+  if (!user.is_active) {
+    throw new ApiError(
+      403,
+      user.deactivation_reason
+        ? `This account has been deactivated: ${user.deactivation_reason}`
+        : "This account has been deactivated",
+    );
   }
 
   const isMatch = await bcrypt.compare(password, user.password);

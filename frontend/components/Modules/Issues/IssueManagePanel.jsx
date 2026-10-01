@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
-import { Loader2, ShieldCheck, UserCheck, UserX } from "lucide-react";
+import { Flag, Loader2, ShieldAlert, ShieldCheck, UserCheck, UserX } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -13,6 +13,14 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Field,
+  FieldContent,
+  FieldDescription,
+  FieldError,
+  FieldLabel,
+} from "@/components/ui/field";
 import {
   NativeSelect,
   NativeSelectOption,
@@ -22,7 +30,12 @@ import { toast } from "@/components/ui/toast";
 import { useAuth } from "@/components/Modules/Auth/AuthProvider";
 import IssueStatusBadge from "@/components/Modules/Issues/IssueStatusBadge";
 import { useResource } from "@/hooks/use-resource";
-import { getOwnStaffProfile, listAvailableStaff, updateIssue } from "@/lib/api";
+import {
+  flagIssueAsInvalid,
+  getOwnStaffProfile,
+  listAvailableStaff,
+  updateIssue,
+} from "@/lib/api";
 import { nextStatuses } from "@/lib/issue-status";
 
 const StatusPanel = ({ issue, onUpdated }) => {
@@ -252,6 +265,125 @@ const AssignmentPanel = ({ issue, onUpdated }) => {
   );
 };
 
+// Only the officer the issue is assigned to can file this flag, and the service
+// refuses it once the issue is resolved or already flagged — so the button is hidden
+// in exactly those states rather than shown and failing on submit.
+const FalseReportPanel = ({ issue, onUpdated }) => {
+  const { session } = useAuth();
+  const email = session?.email ?? null;
+
+  const loadOwnStaff = useCallback(() => getOwnStaffProfile(email), [email]);
+  const { data: ownStaff } = useResource(
+    session?.role === "staff" ? `own-staff:${email}` : null,
+    loadOwnStaff,
+    { enabled: session?.role === "staff" },
+  );
+
+  const [reason, setReason] = useState("");
+  const [fieldError, setFieldError] = useState("");
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const isInvalid = issue.is_invalid === 1 || issue.is_invalid === true;
+  const isAssignedToMe =
+    ownStaff?.id != null && issue.assigned_staff_id === ownStaff.id;
+
+  if (session?.role !== "staff" || !isAssignedToMe) {
+    return null;
+  }
+
+  const flag = async () => {
+    if (reason.trim().length < 10) {
+      setFieldError("Describe what you found, in at least 10 characters.");
+      return;
+    }
+
+    setFieldError("");
+    setError("");
+    setSaving(true);
+
+    try {
+      const response = await flagIssueAsInvalid(issue.id, {
+        reason: reason.trim(),
+      });
+      toast.add({
+        type: "success",
+        title: "Sent to an admin for review",
+        description: "The report stays in the queue until they decide.",
+      });
+      onUpdated(response.data);
+    } catch (flagError) {
+      setError(flagError.message ?? "Could not send this report for review.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="font-heading text-base">
+          This report is not real
+        </CardTitle>
+        <CardDescription>
+          Flag it for an admin to review. You are not deciding it yourself — they can
+          uphold the flag, which deactivates the citizen who filed it, or dismiss it
+          and put the report back to work.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {isInvalid ? (
+          <div className="space-y-2">
+            <Badge variant="destructive" className="gap-1">
+              <ShieldAlert className="size-3" />
+              Flagged as false — awaiting an admin
+            </Badge>
+            <p className="text-sm text-muted-foreground">
+              Your reason: {issue.invalid_reason}
+            </p>
+          </div>
+        ) : issue.status === "Resolved" ? (
+          <p className="text-sm text-muted-foreground">
+            This issue is resolved, so it can no longer be flagged.
+          </p>
+        ) : (
+          <Field data-invalid={Boolean(fieldError)}>
+            <FieldLabel htmlFor="invalid-reason">Why is it not real?</FieldLabel>
+            <FieldContent>
+              <Textarea
+                id="invalid-reason"
+                value={reason}
+                onChange={(event) => setReason(event.target.value)}
+                placeholder="The road outside 14 Mirpur is intact — the photos are from a different street."
+                rows={3}
+                aria-invalid={Boolean(fieldError)}
+              />
+              <FieldDescription>
+                An admin reads this before acting, so specifics help.
+              </FieldDescription>
+              {fieldError && <FieldError>{fieldError}</FieldError>}
+            </FieldContent>
+          </Field>
+        )}
+
+        {!isInvalid && issue.status !== "Resolved" && (
+          <Button
+            variant="outline"
+            onClick={flag}
+            disabled={saving}
+            className="gap-1.5"
+          >
+            {saving ? <Loader2 className="animate-spin" /> : <Flag />}
+            {saving ? "Sending..." : "Flag as a false report"}
+          </Button>
+        )}
+
+        {error && <p className="text-sm text-destructive">{error}</p>}
+      </CardContent>
+    </Card>
+  );
+};
+
 // Status and assignment are separate cards because they have different audiences:
 // a staff member sees the first, an admin sees both.
 const IssueManagePanel = ({ issue, onUpdated }) => {
@@ -261,6 +393,7 @@ const IssueManagePanel = ({ issue, onUpdated }) => {
     <div className="space-y-4">
       <StatusPanel issue={issue} onUpdated={onUpdated} />
       {isAdmin && <AssignmentPanel issue={issue} onUpdated={onUpdated} />}
+      <FalseReportPanel issue={issue} onUpdated={onUpdated} />
     </div>
   );
 };

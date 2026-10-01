@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { ArrowLeft, BadgeCheck, MapPin, User } from "lucide-react";
+import { ArrowLeft, BadgeCheck, Flag, MapPin, User } from "lucide-react";
 
 import {
   Card,
@@ -22,10 +22,12 @@ import {
 } from "@/components/ui/empty";
 
 import LinkButton from "@/components/Modules/Common/LinkButton";
+import IssueComments from "@/components/Modules/Issues/IssueComments";
 import IssuePhotos from "@/components/Modules/Issues/IssuePhotos";
 import IssueStatusBadge from "@/components/Modules/Issues/IssueStatusBadge";
 import IssueStatusTimeline from "@/components/Modules/Issues/IssueStatusTimeline";
 import IssueManagePanel from "@/components/Modules/Issues/IssueManagePanel";
+import IssueVoteButton from "@/components/Modules/Issues/IssueVoteButton";
 import { useAuth } from "@/components/Modules/Auth/AuthProvider";
 import { useResource } from "@/hooks/use-resource";
 import { getIssue, getIssueStatusHistory } from "@/lib/api";
@@ -137,6 +139,12 @@ const IssueDetail = ({ issueId }) => {
         <div className="space-y-2">
           <div className="flex flex-wrap items-center gap-2">
             <IssueStatusBadge status={issue.status} />
+            {issue.is_invalid === 1 || issue.is_invalid === true ? (
+              <Badge variant="destructive" className="gap-1">
+                <Flag className="size-3" />
+                Flagged as false
+              </Badge>
+            ) : null}
             <Badge variant="outline">{issue.category_name}</Badge>
             {issue.citizen_confirmed === 1 || issue.citizen_confirmed === true ? (
               <Badge variant="secondary" className="gap-1">
@@ -189,6 +197,16 @@ const IssueDetail = ({ issueId }) => {
                 <DetailRow label="Reported at">
                   {formatDateTime(issue.created_at)}
                 </DetailRow>
+                {issue.is_invalid === 1 || issue.is_invalid === true ? (
+                  <>
+                    <DetailRow label="Officer&rsquo;s verdict">
+                      {issue.invalid_reason}
+                    </DetailRow>
+                    <DetailRow label="Flagged at">
+                      {formatDateTime(issue.invalid_flagged_at)}
+                    </DetailRow>
+                  </>
+                ) : null}
                 {issue.resolved_at && (
                   <DetailRow label="Resolved at">
                     {formatDateTime(issue.resolved_at)}
@@ -209,10 +227,22 @@ const IssueDetail = ({ issueId }) => {
           </Card>
 
           <IssueManagePanel issue={issue} onUpdated={handleUpdated} />
+
+          {/* Public to anyone, signed in or not — the point of the feature. */}
+          <IssueComments issueId={issue.id} />
         </div>
 
         <div className="space-y-6">
           <IssueStatusTimeline history={history} currentStatus={issue.status} />
+
+          <Card>
+            <CardContent>
+              <IssueVoteButton
+                issueId={issue.id}
+                initialCount={issue.vote_count}
+              />
+            </CardContent>
+          </Card>
 
           <Card>
             <CardHeader>

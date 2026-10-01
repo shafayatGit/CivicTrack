@@ -20,12 +20,32 @@ const ALLOWED_TRANSITIONS = {
   Resolved: ['In Progress'],
 };
 
+// The single definition of what counts as OPEN work, shared with the workload
+// triggers in migrations 015/020/022 and with department.service.js.
+//
+// Migration 021 added is_invalid because a staff member who finds a report bogus
+// flags it rather than working it, and 022 narrowed staff.issue_count to exclude
+// those. Everything that counts "open" has to narrow the same way or the numbers
+// disagree with each other — which is how a staffer ends up looking loaded while
+// the queue is empty.
+//
+// Take an alias because the grouped department query joins `issues i` while the
+// dashboard aggregates read the table unaliased.
+export const openIssuePredicate = (alias = '') => {
+  const prefix = alias ? `${alias}.` : '';
+  return `${prefix}status <> 'Resolved' AND ${prefix}is_invalid = FALSE`;
+};
+
+// reporter.email is deliberately NOT selected here. This payload is public — the route
+// uses optionalAuth so an unauthenticated visitor can read an issue in order to vote on
+// it or comment on it — and publishing the address of whoever reported a pothole is not
+// something a public endpoint should do. The reporter is identified by name.
 const DETAIL_SELECT = `
   i.id, i.user_id, i.category_id, i.ward_id, i.department_id, i.assigned_staff_id,
   i.title, i.description, i.latitude, i.longitude, i.landmark,
   i.status, i.citizen_confirmed, i.resolved_at, i.created_at, i.updated_at,
+  i.is_invalid, i.invalid_reason, i.invalid_flagged_at,
   reporter.name  AS reporter_name,
-  reporter.email AS reporter_email,
   c.name  AS category_name,
   w.name  AS ward_name,
   w.ward_number,
@@ -37,6 +57,7 @@ const LIST_SELECT = `
   i.id, i.title, i.status, i.citizen_confirmed, i.resolved_at,
   i.latitude, i.longitude, i.landmark, i.created_at, i.updated_at,
   i.user_id, i.category_id, i.ward_id, i.department_id, i.assigned_staff_id,
+  i.is_invalid,
   c.name AS category_name,
   w.name AS ward_name, w.ward_number,
   d.name AS department_name,
@@ -119,9 +140,17 @@ export const createIssue = async (reporter, input) => {
 // Read
 // ---------------------------------------------------------------------------
 
+// vote_count and comment_count are correlated subqueries rather than a second round
+// trip or a join, so the public issue page renders with everything it needs in one
+// request. Both lean on an index whose leading column is issue_id
+// (uq_votes_issue_user and idx_comments_issue_visible), so each is an index range
+// scan. comment_count excludes hidden ones, which is what a visitor should see.
 const findById = async (conn, id) => {
   const [rows] = await conn.query(
-    `SELECT ${DETAIL_SELECT}
+    `SELECT ${DETAIL_SELECT},
+            (SELECT COUNT(*) FROM votes v WHERE v.issue_id = i.id) AS vote_count,
+            (SELECT COUNT(*) FROM comments cm
+              WHERE cm.issue_id = i.id AND cm.is_hidden = FALSE) AS comment_count
      FROM issues i
      JOIN users u ON u.id = i.user_id
      JOIN categories c ON c.id = i.category_id
@@ -247,6 +276,7 @@ export const findDuplicates = async ({ wardId, categoryId, latitude, longitude, 
      WHERE i.ward_id = ?
        AND i.category_id = ?
        AND i.status <> 'Resolved'
+       AND i.is_invalid = FALSE
        AND i.latitude BETWEEN ? - ? AND ? + ?
        AND i.longitude BETWEEN ? - ? AND ? + ?
      ORDER BY distance_km ASC
@@ -315,7 +345,8 @@ const assertCanModify = async (conn, issue, actor, { isAssigning }) => {
 
 const loadIssueForUpdate = async (conn, id) => {
   const [rows] = await conn.query(
-    'SELECT id, status, assigned_staff_id, department_id FROM issues WHERE id = ? FOR UPDATE',
+    `SELECT id, status, assigned_staff_id, department_id, is_invalid
+     FROM issues WHERE id = ? FOR UPDATE`,
     [id],
   );
 
@@ -401,6 +432,82 @@ export const updateIssue = async (id, actor, input) => {
 };
 
 // ---------------------------------------------------------------------------
+// False flag (moderation, migration 021)
+// ---------------------------------------------------------------------------
+
+// A staff member who goes out to a report and finds it bogus flags it instead of
+// working it. Deliberately NOT a status: the flag is a judgement about the report's
+// validity, which is orthogonal to how far along the workflow it is — a report can
+// be flagged while still Reported or already In Progress. Migration 021 sets out the
+// full reasoning.
+//
+// Uses the same gate as a status change, so only an admin or the officer the issue is
+// assigned to can flag it, and the row is taken FOR UPDATE first.
+//
+// There is no counterpart that clears the flag: withdrawing a false report is the
+// admin's call, not the flagging officer's, and it happens through
+// falseReport.dismissFlag. Letting a staffer quietly un-flag would make the
+// moderation queue a thing anyone can erase.
+export const flagIssueAsInvalid = async (id, actor, { reason }) => {  return withActor(actor.id, async (conn) => {
+    const issue = await loadIssueForUpdate(conn, id);
+
+    await assertCanModify(conn, issue, actor, { isAssigning: false });
+
+    if (issue.is_invalid) {
+      throw new ApiError(409, 'This issue is already flagged as a false report');
+    }
+
+    // A resolved report was already dealt with, so there is nothing to escalate, and
+    // a false flag on it would drag the issue out of resolved_issue_summary's
+    // neighbourhood for no reason.
+    if (issue.status === 'Resolved') {
+      throw new ApiError(
+        400,
+        'This issue is already resolved and cannot be flagged as a false report',
+      );
+    }
+
+    // The verdict has to name the officer who made it, and false_reports.flagged_by
+    // is a staff.id. Only a staff member can flag at all: the judgement is made on
+    // the ground by the officer the issue is assigned to, while the admin's part in
+    // this workflow is reviewing the queue afterwards. An admin is refused here
+    // rather than quietly stored without an attribution, because a moderation record
+    // that cannot say who made it is not reviewable.
+    if (actor.role !== 'staff') {
+      throw new ApiError(403, 'Only a staff member can flag a report as false');
+    }
+
+    const [flaggers] = await conn.query('SELECT id FROM staff WHERE user_id = ?', [
+      actor.id,
+    ]);
+
+    if (!flaggers[0]) {
+      throw new ApiError(
+        403,
+        'This staff account has no officer profile, so a false report cannot be attributed to it',
+      );
+    }
+
+    await conn.query(
+      `INSERT INTO false_reports (id, issue_id, reason, flagged_by)
+       VALUES (?, ?, ?, ?)`,
+      [randomUUID(), id, reason, flaggers[0].id],
+    );
+
+    // Migration 022's trigger pair picks this up: a false-flagged issue is no longer
+    // open work, so it leaves the assigned officer's issue_count on this statement.
+    await conn.query(
+      `UPDATE issues
+       SET is_invalid = TRUE, invalid_reason = ?, invalid_flagged_at = CURRENT_TIMESTAMP
+       WHERE id = ?`,
+      [reason, id],
+    );
+
+    return findById(conn, id);
+  });
+};
+
+// ---------------------------------------------------------------------------
 // Reports
 // ---------------------------------------------------------------------------
 
@@ -432,9 +539,10 @@ export const getStats = async () => {
   const [totals] = await db.query(
     `SELECT
        COUNT(*) AS total_issues,
-       COALESCE(SUM(status <> 'Resolved'), 0) AS open_issues,
+       COALESCE(SUM(${openIssuePredicate()}), 0) AS open_issues,
        COALESCE(SUM(status =  'Resolved'), 0) AS resolved_issues,
-       COALESCE(SUM(assigned_staff_id IS NULL AND status <> 'Resolved'), 0) AS unassigned_issues
+       COALESCE(SUM(is_invalid = TRUE), 0) AS invalid_issues,
+       COALESCE(SUM(assigned_staff_id IS NULL AND ${openIssuePredicate()}), 0) AS unassigned_issues
      FROM issues`,
   );
 
@@ -506,8 +614,9 @@ export const getMyStats = async (userId) => {
   const [totals] = await db.query(
     `SELECT
        COUNT(*) AS total_issues,
-       COALESCE(SUM(status <> 'Resolved'), 0) AS open_issues,
-       COALESCE(SUM(status =  'Resolved'), 0) AS resolved_issues
+       COALESCE(SUM(${openIssuePredicate()}), 0) AS open_issues,
+       COALESCE(SUM(status =  'Resolved'), 0) AS resolved_issues,
+       COALESCE(SUM(is_invalid = TRUE), 0) AS invalid_issues
      FROM issues
      WHERE user_id = ?`,
     [userId],

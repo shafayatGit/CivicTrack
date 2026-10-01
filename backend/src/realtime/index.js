@@ -1,5 +1,6 @@
 import { Server } from 'socket.io';
 import jwt from 'jsonwebtoken';
+import db from '../config/db.js';
 import ApiError from '../utils/ApiError.js';
 import { setIo } from './hub.js';
 import * as messageService from '../modules/message/message.service.js';
@@ -43,6 +44,19 @@ const authenticate = async (socket, next) => {
 
     if (!ALLOWED_ROLES.has(user.role)) {
       return next(new Error('Messages are available to staff and admins only'));
+    }
+
+    // Same refusal the REST `protect` middleware makes, reached through the same
+    // column. A socket is a long-lived authenticated channel, so without this a
+    // deactivated officer keeps sending messages on a connection opened before the
+    // deactivation. Deactivation also disconnects the sockets it already has open —
+    // see disconnectUser in hub.js, called from the falseReport service.
+    const [rows] = await db.query('SELECT is_active FROM users WHERE id = ?', [
+      user.id,
+    ]);
+
+    if (!rows[0] || !rows[0].is_active) {
+      return next(new Error('This account has been deactivated'));
     }
 
     const identity = await messageService.getIdentity(user);
