@@ -38,8 +38,9 @@ export const decodeToken = (token) => {
     const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
     return JSON.parse(
       decodeURIComponent(
-        Array.from(atob(base64), (char) =>
-          `%${char.charCodeAt(0).toString(16).padStart(2, "0")}`,
+        Array.from(
+          atob(base64),
+          (char) => `%${char.charCodeAt(0).toString(16).padStart(2, "0")}`,
         ).join(""),
       ),
     );
@@ -108,7 +109,8 @@ export const apiFetch = async (path, { body, headers, ...options } = {}) => {
   // FormData has to be handed to fetch untouched: the browser appends the multipart
   // boundary itself, and forcing a Content-Type here would either strip that
   // boundary (multer rejects the stream) or mislabel a JSON payload.
-  const isFormData = typeof FormData !== "undefined" && body instanceof FormData;
+  const isFormData =
+    typeof FormData !== "undefined" && body instanceof FormData;
   if (!isFormData && body !== undefined) {
     requestHeaders.set("Content-Type", "application/json");
   }
@@ -127,7 +129,8 @@ export const apiFetch = async (path, { body, headers, ...options } = {}) => {
     // the origin and sets Access-Control-Allow-Credentials, so this is permitted.
     credentials: "include",
     headers: requestHeaders,
-    body: body === undefined ? undefined : isFormData ? body : JSON.stringify(body),
+    body:
+      body === undefined ? undefined : isFormData ? body : JSON.stringify(body),
   });
 
   const data = await response.json().catch(() => null);
@@ -192,6 +195,23 @@ export const updateDepartment = (id, payload) =>
 
 export const deleteDepartment = (id) =>
   apiFetch(`/api/departments/${id}`, { method: "DELETE" });
+
+// Stored resolution snapshots. Omitting the bounds asks the server for the current
+// calendar month and echoes the window it chose back on `period`, so the UI never has
+// to re-derive "this month" and can label the report from the response instead.
+export const listDepartmentPerformance = (query) =>
+  apiFetch(withQuery("/api/departments/performance", query));
+
+export const getDepartmentPerformance = (id, query) =>
+  apiFetch(withQuery(`/api/departments/${id}/performance`, query));
+
+// Admin-only. Idempotent: re-running a window refreshes that window's numbers rather
+// than adding a second set, so this is safe to call for the same month repeatedly.
+export const generateDepartmentPerformance = (payload) =>
+  apiFetch("/api/departments/performance/snapshot", {
+    method: "POST",
+    body: payload,
+  });
 
 // --- wards ------------------------------------------------------------------
 
@@ -284,7 +304,10 @@ export const listFalseReports = (query) =>
 
 // Upholding the flag: deactivates the citizen who filed the report.
 export const deactivateCitizen = (flagId, payload) =>
-  apiFetch(`/api/false-reports/${flagId}/deactivate`, { method: "POST", body: payload });
+  apiFetch(`/api/false-reports/${flagId}/deactivate`, {
+    method: "POST",
+    body: payload,
+  });
 
 // Dismissing it: the officer was wrong, the report returns to the workflow.
 export const dismissFalseReport = (flagId) =>
@@ -292,6 +315,19 @@ export const dismissFalseReport = (flagId) =>
 
 // --- users -----------------------------------------------------------------
 
+// Self-service. No id in the path or body on purpose: the server takes the actor from
+// the verified token, so there is nothing here that could be pointed at another account.
+// GET exists because the JWT carries only {id, name, email, role} — the settings form has
+// no other way to show the phone number and NID the account already holds.
+export const getMyProfile = () => apiFetch("/api/users/profile");
+
+export const updateProfile = (payload) =>
+  apiFetch("/api/users/profile", { method: "PUT", body: payload });
+
+export const changePassword = (payload) =>
+  apiFetch("/api/users/change-password", { method: "POST", body: payload });
+
+// Admin-only, acting on someone else's account.
 export const getUser = (id) => apiFetch(`/api/users/${id}`);
 
 export const reactivateUser = (id) =>
@@ -305,7 +341,8 @@ export const getVoteSummary = (id) => apiFetch(`/api/issues/${id}/vote`);
 
 // Toggles: one call both casts and withdraws a vote, and answers with the new state
 // AND the new count, so the button and the badge can never disagree.
-export const toggleVote = (id) => apiFetch(`/api/issues/${id}/vote`, { method: "POST" });
+export const toggleVote = (id) =>
+  apiFetch(`/api/issues/${id}/vote`, { method: "POST" });
 
 export const listComments = (id, query) =>
   apiFetch(withQuery(`/api/issues/${id}/comments`, query));
@@ -318,14 +355,16 @@ export const createComment = (id, payload) =>
 // Admin moderation, on a different URL from the public thread so the two cannot be
 // confused for one another.
 export const hideComment = (id, payload) =>
-  apiFetch(`/api/moderation/comments/${id}/hide`, { method: "POST", body: payload });
+  apiFetch(`/api/moderation/comments/${id}/hide`, {
+    method: "POST",
+    body: payload,
+  });
 
 export const restoreComment = (id) =>
   apiFetch(`/api/moderation/comments/${id}/restore`, { method: "POST" });
 
 export const deleteComment = (id) =>
   apiFetch(`/api/moderation/comments/${id}`, { method: "DELETE" });
-
 
 // --- issue photos -----------------------------------------------------------
 
@@ -352,7 +391,8 @@ export const deleteIssuePhoto = (id) =>
 
 export const listAdmins = () => apiFetch("/api/messages/admins");
 
-export const listThreads = (query) => apiFetch(withQuery("/api/messages/threads", query));
+export const listThreads = (query) =>
+  apiFetch(withQuery("/api/messages/threads", query));
 
 export const getUnreadCount = () => apiFetch("/api/messages/unread-count");
 

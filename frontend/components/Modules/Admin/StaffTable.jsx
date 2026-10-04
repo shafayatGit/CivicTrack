@@ -101,14 +101,29 @@ const StaffTable = () => {
   };
 
   const handleCreate = async (payload) => {
-    await createStaff(payload);
+    // The 201 comes back either way: the account is committed before the mail is
+    // attempted, so a bounced SMTP send is reported here rather than as a failed
+    // request. Retrying the POST would 409 on the now-taken email and strand the
+    // account, which is why the two cases are worded differently below.
+    const response = await createStaff(payload);
     setCreating(false);
     setPage(1);
     reload();
+
+    if (response.data?.credentialsEmailed === false) {
+      toast.add({
+        type: "warning",
+        title: "Staff account created, but the email did not send",
+        description:
+          "The account exists and the password is not recoverable — mail it to them yourself, or delete the account and create it again.",
+      });
+      return;
+    }
+
     toast.add({
       type: "success",
       title: "Staff account created",
-      description: "Share the temporary password out of band.",
+      description: "Login details emailed to them. They must change the password after signing in.",
     });
   };
 
@@ -130,7 +145,7 @@ const StaffTable = () => {
     <div className="space-y-6">
       <AdminPageHeader
         title="Staff"
-        description="Officers who can be assigned issues. Creating one also creates the login account, in a single transaction."
+        description="Officers who can be assigned issues. Creating one also creates the login account, in a single transaction, and emails them their temporary password."
         actions={
           <Button onClick={() => setCreating(true)} className="gap-1.5">
             <Plus />

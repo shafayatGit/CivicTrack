@@ -4,6 +4,7 @@ import db from '../../config/db.js';
 import ApiError from '../../utils/ApiError.js';
 import { buildMeta, limitClause, paginationSchema } from '../../utils/pagination.js';
 import { withActor } from '../../utils/withActor.js';
+import { sendWelcomeEmail } from '../../utils/email.js';
 
 // staff is a 1:1 profile extension of users, so every read has to bridge the two.
 // Joining once is the whole point: listing staff without the join means one extra
@@ -52,8 +53,17 @@ const assertDepartmentExists = async (conn, departmentId) => {
 //
 // The role is hardcoded to 'staff' rather than taken from the body — a caller must
 // not be able to mint an admin by posting role: "admin" to this endpoint.
-export const createStaff = async ({ name, email, password, phone, nid, departmentId }) =>
-  withActor(null, async (conn) => {
+// The plaintext password is the caller's, not generated here, so it is still in scope
+// when the welcome mail goes out — but only after the transaction has COMMITTED.
+//
+// Sending inside withActor would mean holding a pooled connection open across an SMTP
+// round trip, and a mail failure would roll the account back. The second part is the
+// one that actually matters: this endpoint's retry story is bad either way (a second
+// POST hits assertEmailAvailable and 409s), so an account that exists but whose mail
+// bounced is recoverable — the admin can see it here and resend — while an account that
+// was rolled back looks like nothing happened and the plaintext password is gone.
+export const createStaff = async ({ name, email, password, phone, nid, departmentId }) => {
+  const staff = await withActor(null, async (conn) => {
     await assertEmailAvailable(conn, email);
     await assertDepartmentExists(conn, departmentId);
 
@@ -82,6 +92,29 @@ export const createStaff = async ({ name, email, password, phone, nid, departmen
 
     return rows[0];
   });
+
+  let credentialsEmailed = true;
+  try {
+    await sendWelcomeEmail({
+      to: email,
+      name,
+      password,
+      departmentName: staff.department_name,
+      loginUrl: process.env.FRONTEND_URL,
+    });
+  } catch (error) {
+    // Swallowed on purpose, see above: the account exists and the admin is the only
+    // person who still has the password, so failing the request would throw both away.
+    // credentialsEmailed is what lets the console say so instead of failing silently.
+    credentialsEmailed = false;
+    console.error(
+      `Staff ${staff.id} created but the welcome email to ${email} failed:`,
+      error.message,
+    );
+  }
+
+  return { ...staff, credentialsEmailed };
+};
 
 export const listStaff = async (query) => {
   const { page, limit, departmentId, search } = query;

@@ -20,7 +20,11 @@ import {
 
 import { ApiRequestError } from "@/lib/api";
 
-const initialFieldErrors = { name: "", contactEmail: "" };
+const initialFieldErrors = {
+  name: "",
+  contactEmail: "",
+  resolutionTargetHours: "",
+};
 
 // Departments and wards share this shape: a unique display name plus one or two
 // optional operational fields, validated client-side to the same rules the Zod
@@ -29,6 +33,13 @@ const DepartmentForm = ({ initialValues, submitLabel, onSubmit, onCancel }) => {
   const [form, setForm] = useState({
     name: initialValues?.name ?? "",
     contactEmail: initialValues?.contact_email ?? "",
+    // A department with no target is a deliberate "we don't publish an SLA", not an
+    // oversight, so this starts blank rather than pre-filled with a default. Only a
+    // value the admin actually typed is sent.
+    resolutionTargetHours:
+      initialValues?.resolution_target_hours != null
+        ? String(initialValues.resolution_target_hours)
+        : "",
   });
   const [fieldErrors, setFieldErrors] = useState(initialFieldErrors);
   const [serverError, setServerError] = useState("");
@@ -58,6 +69,21 @@ const DepartmentForm = ({ initialValues, submitLabel, onSubmit, onCancel }) => {
       nextErrors.contactEmail = "Must be a valid email.";
     }
 
+    // Same optional contract, but numeric: min(1) mirrors chk_departments_resolution_target
+    // in migration 024, and the ceiling keeps a typo from silently setting a 40-year SLA.
+    const targetRaw = form.resolutionTargetHours.trim();
+    if (targetRaw) {
+      const target = Number(targetRaw);
+      if (!/^\d+$/.test(targetRaw)) {
+        nextErrors.resolutionTargetHours = "Must be a whole number of hours.";
+      } else if (target < 1) {
+        nextErrors.resolutionTargetHours = "Target must be at least 1 hour.";
+      } else if (target > 8760) {
+        nextErrors.resolutionTargetHours =
+          "Target cannot exceed 8760 hours (one year).";
+      }
+    }
+
     setFieldErrors(nextErrors);
     if (Object.values(nextErrors).some(Boolean)) {
       return;
@@ -65,7 +91,13 @@ const DepartmentForm = ({ initialValues, submitLabel, onSubmit, onCancel }) => {
 
     setSubmitting(true);
     try {
-      await onSubmit({ name, contactEmail: contactEmail || null });
+      await onSubmit({
+        name,
+        contactEmail: contactEmail || null,
+        // null, not 0 and not "": the backend distinguishes "no target set" (overdue
+        // reports NULL) from a real number, and this is how that is expressed.
+        resolutionTargetHours: targetRaw ? Number(targetRaw) : null,
+      });
     } catch (error) {
       if (error instanceof ApiRequestError && error.response) {
         const fromServer = {};
@@ -140,6 +172,35 @@ const DepartmentForm = ({ initialValues, submitLabel, onSubmit, onCancel }) => {
             <FieldError>{fieldErrors.contactEmail}</FieldError>
           ) : (
             <FieldDescription>Optional. Where the public is directed.</FieldDescription>
+          )}
+        </FieldContent>
+      </Field>
+
+      <Field>
+        <FieldLabel htmlFor="department-target">Resolution target</FieldLabel>
+        <FieldContent>
+          <Input
+            id="department-target"
+            name="resolutionTargetHours"
+            type="number"
+            inputMode="numeric"
+            min="1"
+            max="8760"
+            step="1"
+            placeholder="e.g. 72"
+            value={form.resolutionTargetHours}
+            onChange={handleChange}
+            disabled={submitting}
+            aria-invalid={Boolean(fieldErrors.resolutionTargetHours)}
+          />
+          {fieldErrors.resolutionTargetHours ? (
+            <FieldError>{fieldErrors.resolutionTargetHours}</FieldError>
+          ) : (
+            <FieldDescription>
+              Hours allowed to resolve a report. Leave blank if this department does
+              not publish a target — overdue is then reported as unmeasured rather
+              than as zero.
+            </FieldDescription>
           )}
         </FieldContent>
       </Field>

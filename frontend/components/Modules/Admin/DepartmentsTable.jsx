@@ -116,6 +116,9 @@ const DepartmentsTable = () => {
                     Resolved
                   </TableHead>
                   <TableHead className="hidden text-center lg:table-cell">Total</TableHead>
+                  <TableHead className="hidden text-center sm:table-cell">
+                    Target
+                  </TableHead>
                   <TableHead className="hidden xl:table-cell">Created</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -135,6 +138,14 @@ const DepartmentsTable = () => {
                     </TableCell>
                     <TableCell className="hidden text-center tabular-nums text-muted-foreground lg:table-cell">
                       {formatNumber(department.total_issues)}
+                    </TableCell>
+                    <TableCell className="hidden whitespace-nowrap text-center tabular-nums text-muted-foreground sm:table-cell">
+                      {/* "No target" is a real setting, not missing data — a department
+                          that has not published an SLA is reported as unmeasured, so it
+                          must not be rendered as a 0-hour target. */}
+                      {department.resolution_target_hours != null
+                        ? `${formatNumber(department.resolution_target_hours)}h`
+                        : "None"}
                     </TableCell>
                     <TableCell className="hidden whitespace-nowrap text-muted-foreground xl:table-cell">
                       {formatDate(department.created_at)}

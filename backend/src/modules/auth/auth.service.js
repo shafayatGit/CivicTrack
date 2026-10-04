@@ -11,7 +11,12 @@ const table = "users";
 // only show a real name if the token carries one. `id` (not the registered `sub`) is
 // the subject claim, and protect exposes this payload verbatim as req.user, so both
 // sides read the same keys.
-const generateToken = (user) =>
+//
+// Exported because a profile edit changes `name`, and `name` is one of the four claims
+// above. Without re-minting, the header would keep rendering the old name until the
+// token expired — up to JWT_EXPIRES_IN — which reads as "my save did nothing". See
+// user.controller.updateProfile.
+export const generateToken = (user) =>
   jwt.sign(
     { id: user.id, name: user.name, email: user.email, role: user.role },
     process.env.JWT_SECRET,

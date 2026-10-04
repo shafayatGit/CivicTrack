@@ -3,12 +3,14 @@ import {
   ChartNoAxesColumn,
   Flag,
   FolderTree,
+  Gauge,
   LayoutDashboard,
   LifeBuoy,
   MapPin,
   MessagesSquare,
   OctagonX,
   PlusCircle,
+  UserCog,
   Users,
 } from "lucide-react";
 
@@ -24,6 +26,11 @@ export const PORTAL_NAV = [
   { href: "/issues", label: "Issues", icon: OctagonX, roles: null },
   { href: "/report", label: "Report an issue", icon: PlusCircle, roles: ["citizen"] },
   { href: "/messages", label: "Messages", icon: MessagesSquare, roles: ["staff", "admin"] },
+  // roles: null on purpose — name, phone and password are not role-specific, so gating
+  // this would mean three of the six roles could not correct a typo in their own name.
+  // It lives in PORTAL_NAV rather than ADMIN_NAV so an admin reaches it from the same
+  // shell a citizen does, rather than through a second admin-only copy.
+  { href: "/profile", label: "Profile settings", icon: UserCog, roles: null },
 ];
 
 export const ADMIN_NAV = [
@@ -32,6 +39,7 @@ export const ADMIN_NAV = [
     items: [
       { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
       { href: "/admin/reports", label: "Reports", icon: ChartNoAxesColumn },
+      { href: "/admin/performance", label: "Performance", icon: Gauge },
     ],
   },
   {
@@ -62,6 +70,7 @@ const ACTIVE_PREFIXES = {
   "/admin/staff": ["/admin/staff"],
   "/admin/issues": ["/admin/issues"],
   "/admin/reports": ["/admin/reports"],
+  "/admin/performance": ["/admin/performance"],
   "/admin/false-reports": ["/admin/false-reports"],
 };
 

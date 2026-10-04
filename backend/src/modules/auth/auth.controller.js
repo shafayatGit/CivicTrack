@@ -1,7 +1,10 @@
 import asyncHandler from '../../utils/asyncHandler.js';
 import * as authService from './auth.service.js';
 
-const COOKIE_OPTIONS = {
+// Exported so a profile edit can re-issue the same cookie with the same options rather
+// than repeating this object; two copies of a cookie policy is one drift away from
+// cookies that are set with a different lifetime in two places.
+export const COOKIE_OPTIONS = {
   httpOnly: true,
   sameSite: 'lax',
   secure: process.env.NODE_ENV === 'production',

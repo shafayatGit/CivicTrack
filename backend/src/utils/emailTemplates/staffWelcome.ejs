@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Your <%= appName %> staff account</title>
+  </head>
+  <body
+    style="margin:0;padding:24px;background:#f6f6f7;font-family:ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#18181b;"
+  >
+    <table
+      role="presentation"
+      width="100%"
+      cellpadding="0"
+      cellspacing="0"
+      style="max-width:560px;margin:0 auto;background:#ffffff;border:1px solid #e4e4e7;border-radius:12px;"
+    >
+      <tr>
+        <td style="padding:28px 32px 8px 32px;">
+          <p style="margin:0;font-size:13px;letter-spacing:0.08em;text-transform:uppercase;color:#71717a;">
+            <%= appName %>
+          </p>
+          <h1 style="margin:8px 0 0 0;font-size:22px;line-height:1.3;font-weight:650;">
+            Your staff account is ready
+          </h1>
+        </td>
+      </tr>
+
+      <tr>
+        <td style="padding:16px 32px 0 32px;font-size:15px;line-height:1.6;">
+          <p style="margin:0 0 16px 0;">
+            Hello <strong><%= name %></strong>, an administrator has created your
+            <% if (departmentName) { %>
+            account in the <strong><%= departmentName %></strong> department.
+            <% } else { %>
+            account.
+            <% } %>
+            Sign in with the credentials below.
+          </p>
+        </td>
+      </tr>
+
+      <tr>
+        <td style="padding:8px 32px 0 32px;">
+          <table
+            role="presentation"
+            width="100%"
+            cellpadding="0"
+            cellspacing="0"
+            style="background:#fafafa;border:1px solid #e4e4e7;border-radius:10px;"
+          >
+            <tr>
+              <td style="padding:14px 18px;border-bottom:1px solid #e4e4e7;font-size:13px;color:#71717a;width:120px;">
+                Email
+              </td>
+              <td style="padding:14px 18px;border-bottom:1px solid #e4e4e7;font-size:15px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">
+                <%= email %>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:14px 18px;font-size:13px;color:#71717a;">Password</td>
+              <td style="padding:14px 18px;font-size:15px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">
+                <%= password %>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+
+      <% if (loginUrl) { %>
+      <tr>
+        <td style="padding:20px 32px 0 32px;">
+          <a
+            href="<%= loginUrl %>"
+            style="display:inline-block;background:#18181b;color:#ffffff;text-decoration:none;font-size:15px;font-weight:550;padding:11px 22px;border-radius:8px;"
+          >
+            Sign in
+          </a>
+        </td>
+      </tr>
+      <% } %>
+
+      <tr>
+        <td style="padding:20px 32px 0 32px;">
+          <p
+            style="margin:0;padding:12px 16px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;font-size:14px;line-height:1.5;color:#78350f;"
+          >
+            <strong>Change this password after your first sign-in.</strong> This is the
+            only message that will contain it — account settings can set a new one, but
+            nobody can read the old one back for you.
+          </p>
+        </td>
+      </tr>
+
+      <tr>
+        <td style="padding:24px 32px 28px 32px;font-size:13px;line-height:1.6;color:#71717a;">
+          <p style="margin:0;">
+            If you were not expecting this account, reply to your administrator and do
+            not sign in.
+          </p>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>
